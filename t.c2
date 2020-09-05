@@ -1,0 +1,470 @@
+#include <stdio.h>
+
+int cyclic_pointer_init(
+	void *param,
+	int (*prev)(void *, void *, void ***),
+	int (*next)(void *, void *, void ***),
+	void *ptr)
+{
+	void **ptr_prev, **ptr_next;
+
+	if(prev(param, ptr, &ptr_prev)) {
+		return 1;
+	}
+	if(next(param, ptr, &ptr_next)) {
+		return 1;
+	}
+
+	*ptr_prev = ptr;
+	*ptr_next = ptr;
+
+	return 0;
+}
+int cyclic_pointer_is_terminated(
+	void *param,
+	int (*link)(void *, void *, void ***),
+	void *ptr,
+	int *res)
+{
+	void **ptr_link;
+
+	if(link(param, ptr, &ptr_link)) {
+		return 1;
+	}
+
+	if(ptr == ptr_link) {
+		*res = 1;
+	} else {
+		*res = 0;
+	}
+
+	return 0;
+}
+int cyclic_pointer_insert(
+	void *param,
+	int (*prev)(void *, void *, void ***),
+	int (*next)(void *, void *, void ***),
+	void *ptr,
+	void *qtr)
+{
+	void **ptr_prev, **ptr_next;
+	void **qtr_prev, **qtr_next;
+	void **ptr_next_prev, **qtr_prev_next;
+
+	if(prev(param, ptr, &ptr_prev)) {
+		return 1;
+	}
+	if(next(param, ptr, &ptr_next)) {
+		return 1;
+	}
+	if(prev(param, qtr, &qtr_prev)) {
+		return 1;
+	}
+	if(next(param, qtr, &qtr_next)) {
+		return 1;
+	}
+	if(prev(param, *ptr_next, &ptr_next_prev)) {
+		return 1;
+	}
+	if(prev(param, *qtr_prev, &qtr_prev_next)) {
+		return 1;
+	}
+
+	*ptr_next_prev = qtr_prev;
+	*qtr_prev_next = ptr_next;
+	*ptr_next = qtr;
+	*qtr_prev = ptr;
+
+	return 0;
+};
+
+struct pointer {
+	struct pointer *prev;
+	struct pointer *next;
+	void *memory;
+};
+int pointer_prev(
+	void *param,
+	void *ptr,
+	void ***p_prev)
+{
+	if(ptr == NULL || p_prev == NULL) {
+		return 1;
+	}
+
+	*p_prev = (void **)&((struct pointer *)ptr)->prev;
+
+	return 0;
+}
+int pointer_next(
+	void *param,
+	void *ptr,
+	void ***p_next)
+{
+	if(ptr == NULL || p_next == NULL) {
+		return 1;
+	}
+
+	*p_next = (void **)&((struct pointer *)ptr)->next;
+
+	return 0;
+}
+
+#if 0
+int pointer_init(
+	struct pointer *ptr)
+{
+	if(ptr == NULL) {
+		return 1;
+	}
+
+	ptr->prev = ptr;
+	ptr->next = ptr;
+
+	return 0;
+}
+int pointer_is_single(
+	struct pointer *ptr,
+	int *res)
+{
+	if(ptr == NULL) {
+		return 1;
+	}
+
+	if(ptr == ptr->prev) {
+		*res = 1;
+	} else {
+		*res = 0;
+	}
+
+	return 0;
+}
+#endif
+int pointer_set(
+	struct pointer *ptr,
+	void *mem)
+{
+	struct pointer *temp;
+
+	if(ptr == NULL) {
+		return 1;
+	}
+
+	temp = ptr;
+	do {
+		temp->memory = mem;
+		temp = temp->next;
+	} while(temp != ptr);
+
+	return 0;
+}
+/**
+ ****************************************************************
+ *	@date 2020/08/26
+ *
+ *	Two loops of pointers are concatenated. Nodes in loops
+ *	are denoded P and Q. Links to be broken are
+ *		... P --> next_P ...
+ *		... prev_Q --> Q ...
+ *	and those to be constructed are
+ *		... P --> Q ...
+ *		... prev_Q --> next_P ...
+ *	When two ditinct loops
+ *		    ...  next_P   prev_Q  ...
+ *		  .        ^         |        .
+ *		  .        |         |        .
+ *		  .        |         V        .
+ *		prev_P --> P         Q --> next_Q
+ *	are conatenated, the result is
+ *		  ... next_P <-- prev_Q ...
+ *		  .                       .
+ *		  .                       .
+ *		  .                       .
+ *		prev_P --> P --> Q --> next_Q
+ *	In constrast, a single loop structure
+ *                  ...   ...   ...   ...   ...
+ *		  .                             .
+ *		  .         ... ... ...         .
+ *		  .        |           |        .
+ *		  .      next_P     prev_Q      .
+ *		  .        ^           |        .
+ *		  .        |           |        .
+ *		  .        |           V        .
+ *		prev_P --> P           Q --> next_Q
+ *	is converted into two loops.
+ *                  ...   ...   ...   ...   ...
+ *		  .                             .
+ *		  .         ... ... ...         .
+ *		  .        |           |        .
+ *		  .      next_P <-- prev_Q      .
+ *		  .                             .
+ *		prev_P --> P    -->    Q --> next_Q
+ ****************************************************************
+ */
+#if 0
+int pointer_insert(
+	struct pointer *p,
+	struct pointer *q)
+{
+	if(p == NULL || q == NULL) {
+		return 1;
+	}
+
+	p->next->prev = q->prev;
+	q->prev->next = p->next;
+	p->next = q;
+	q->prev = p;
+
+	return 0;
+}
+#endif
+
+struct header {
+	struct header *prev;
+	struct header *next;
+	int flag;
+};
+struct allocked {
+	struct pointer *link;
+	struct pointer *angel;
+};
+struct freed {
+	struct header *backward;
+	struct header *forward;
+};
+#define ALLOCKED(head) ((struct allocked *)&((struct header *)head)[1])
+#define FREED(head) ((struct freed *)&((struct header *)head)[1])
+int header_prev(
+	void *param,
+	void *head,
+	void ***p_prev)
+{
+	if(head == NULL || p_prev == NULL) {
+		return 1;
+	}
+
+	*p_prev = (void **)&((struct header *)head)->prev;
+
+	return 0;
+}
+int header_next(
+	void *param,
+	void *head,
+	void ***p_next)
+{
+	if(head == NULL || p_next == NULL) {
+		return 1;
+	}
+
+	*p_next = (void **)&((struct header *)head)->next;
+
+	return 0;
+}
+
+int header_link(struct header *head)
+{
+	int link;
+
+	link = (struct pointer *)head->next
+		- ALLOCKED(head)->link;
+
+	return link;
+}
+int header_size(struct header *head)
+{
+	int size;
+
+	size = (char *)ALLOCKED(head)->link - (char *)ALLOCKED(head);
+
+	return size;
+}
+
+int print(struct header *head)
+{
+	struct header *temp;
+
+	temp = head;
+	while(temp != NULL) {
+		int i;
+		int size;
+		int link;
+
+		printf("%x: prev(%x), next(%x), flag(%x)\n",
+			temp, temp->prev, temp->next, temp->flag);
+/*
+		size = header_size(temp);
+		link = header_link(temp);
+		printf("\tsize, link = %d, %d\n", size, link);
+		for(i = 0; i < link; ++i) {
+			printf("\tlink[%d](%x): prev(%x), next(%x), memory(%x)\n",
+				i, &ALLOCKED(temp)->link[i],
+				ALLOCKED(temp)->link[i].prev,
+				ALLOCKED(temp)->link[i].next,
+				ALLOCKED(temp)->link[i].memory);
+		}
+*/
+		temp = temp->next;
+	}
+}
+
+/**
+ ****************************************************************
+ */
+
+int split(struct header *head, int size, int length)
+{
+	int i;
+	struct pointer *link;
+	struct header *tail;
+
+	if(FREED(head)->backward != NULL) {
+		FREED(FREED(head)->backward)->forward = FREED(head)->forward;
+	}
+	if(FREED(head)->forward != NULL) {
+		FREED(FREED(head)->forward)->backward = FREED(head)->backward;
+	}
+
+	link = (char *)ALLOCKED(head) + sizeof(struct allocked) + size;
+	tail = (char *)link + sizeof(struct pointer) * length;
+
+	tail->next = head->next;
+	head->next = tail;
+
+	ALLOCKED(head)->link = link;
+	ALLOCKED(head)->angel = NULL;
+
+	for(i = 0; i < length; ++i) {
+		cyclic_pointer_init(NULL,
+			pointer_prev,
+			pointer_next,
+			&link[i]);
+		link[i].memory = NULL;
+	}
+
+	FREED(tail)->backward = tail;
+	FREED(tail)->forward = tail;
+}
+
+int link_set(struct header *head, int n, struct header *object)
+{
+	int is_single;
+	struct header *target;
+
+	target = ALLOCKED(head)->link[n].memory;
+	if(target != NULL) {
+		if(ALLOCKED(target)->angel == &ALLOCKED(head)->link[n]) {
+			cyclic_pointer_is_terminated(NULL,
+				pointer_prev,
+				&ALLOCKED(head)->link[n],
+				&is_single);
+
+			if(is_single) {
+				ALLOCKED(target)->angel = NULL;
+			} else {
+				ALLOCKED(target)->angel =
+					ALLOCKED(head)->link[n].next;
+			}
+		}
+	}
+
+	cyclic_pointer_insert(NULL,
+		pointer_prev,
+		pointer_next,
+		&ALLOCKED(head)->link[n],
+		&ALLOCKED(head)->link[n]);
+
+	ALLOCKED(head)->link[n].memory = object;
+	if(object != NULL) {
+		struct pointer *temp;
+
+		temp = ALLOCKED(object)->angel;
+		ALLOCKED(object)->angel = &ALLOCKED(head)->link[n];
+		if(temp != NULL) {
+			cyclic_pointer_insert(NULL,
+				pointer_prev,
+				pointer_next,
+				&ALLOCKED(head)->link[n], temp);
+			return 0;
+		} else {
+			cyclic_pointer_init(NULL,
+				pointer_prev,
+				pointer_next,
+				&ALLOCKED(head)->link[n]);
+			return 0;
+		}
+	}
+
+	return 0;
+}
+
+int migrate(
+	struct header *from,
+	struct header *to)
+{
+	int i;
+	int length;
+	int size;
+	struct pointer *temp;
+
+	length = header_link(from);
+	size = header_size(from);
+	split(to, size, length);
+
+	pointer_set(ALLOCKED(from)->angel, to);
+
+	ALLOCKED(to)->angel = ALLOCKED(from)->angel;
+	ALLOCKED(from)->angel = NULL;
+
+	for(i = 0; i < length; ++i) {
+		link_set(to, i, ALLOCKED(from)->link[i].memory);
+		link_set(from, i, NULL);
+	}
+}
+
+//
+//	link i  j;
+//	link_set(proc, i, proc->link[j].memory);
+//	in i j;
+//	link_set(proc, i, proc->link[i].memory->link[j].memory);
+//
+
+struct header buffer[1000];
+struct header *pool;
+int main()
+{
+	struct header *arena, *proc;
+	struct header *head1, *head2, *head3, *head4;
+	printf("hello, world!\n");
+	printf("sizeof(pointer) = %d\n", sizeof(struct pointer));
+	printf("sizeof(header) = %d\n", sizeof(struct header));
+
+	buffer[0].prev = &buffer[0];
+	buffer[0].next = &buffer[1000];
+	pool = buffer;
+	printf("link, size = %d, %d\n",
+		header_link(pool), header_size(pool));
+
+	print(buffer);
+	printf("################################\n"); fflush(stdout);
+
+	//cyclic_pointer_insert(NULL, header_prev, header_next, , );
+#if 0
+	split(pool, 0, 10); proc = pool; pool = pool->next;
+	split(pool, 1000, 0); arena = pool; pool = pool->next;
+	split(arena, 0, 2);
+	link_set(arena, 0, arena->next);
+//	split(arena->link[0], size, length);
+#endif
+
+	split(pool, 10, 1); head1 = pool; pool = pool->next;
+	split(pool, 20, 2); head2 = pool; pool = pool->next;
+	split(pool, 30, 3); head3 = pool; pool = pool->next;
+	link_set(head1, 0, head2);
+	link_set(head2, 0, head1);
+	link_set(head3, 0, head1);
+	print(buffer);
+	printf("################################\n"); fflush(stdout);
+
+	migrate(head2, pool); head4 = pool; pool = pool->next;
+	print(buffer);
+}
