@@ -478,8 +478,8 @@ int apmath_base_array_multiply(
  *		X*T*b^x <= F*T^2 < (X+1)*T*b^x
  *		X*T*b^(x-c) <= F*T^2/C < (X+1)*T*b^(x-c)
  *		2T-(X+1)*T*b^(x-c) < 2T-F*T^2/C <= 2T-X*T*b^(x-c)
- *		       ||                ||              ||
- *		      LEFT            FIXED PT.         RIGHT
+ *		      ||             ||                ||
+ *		     LEFT          FIXED PT.          RIGHT
  *	Here X*b^x is truncated approximation of F*T. If (x-c) is
  *	equal to or less than (-t), the +1 effect in (X+1) of
  *	LEFT becomes trivial. So set
@@ -627,7 +627,7 @@ int apmath_base_array_inverse(
 	int i;
 	int total_length;
 	int from_below;
-	apmath_base_t carry; // not used any more probably
+	apmath_base_t carry;
 
 /* 1.	If A = 'from' = 0x0100...000, then the newton inverse is
  *	0x00ff...ff. If so, when the newton method is converging
@@ -689,7 +689,7 @@ out:
  */
 	for(i = 0; i < 256; ++i) {
 //	for(i = 0; i < 16; ++i) {
-		apmath_base_t msbyte;
+		//apmath_base_t msbyte;
 
 #ifdef DEBUG
 		printf("i = %d\n", i);
@@ -701,50 +701,39 @@ out:
 
 		apmath_base_array_multiply(
 			&buf[to_length - from_length + 1],
-			&msbyte,
+			&buf[2 * to_length],
 			to, to_length,
 			from, from_length);
 #ifdef DEBUG
 		printf("CAL1:\tbuf = ");
 		print_number(buf, total_length);
-		//printf("msbyte = %x\n", msbyte);
 #endif
 
-		if(msbyte > 0) {
+		if(buf[2 * to_length] > 0) {
+		//if(msbyte > 0) {
 			apmath_base_array_decrement(
 				to, NULL, to, to_length);
 			break;
 		}
-#if 0
 		apmath_base_array_increment(
 			&buf[to_length], NULL,
-			&buf[to_length], to_length);
-#endif
+			&buf[to_length], to_length + 1);
 
 		apmath_base_array_multiply(
-			&buf[0], &buf[2 * to_length - 1],
-			&buf[to_length], to_length,
+			&buf[0],
+			&buf[2 * to_length],
+			&buf[to_length], to_length + 1,
 			to, to_length);
 #ifdef DEBUG
 		printf("CAL3:\tbuf = ");
 		print_number(buf, total_length);
 #endif
 
-		apmath_base_array_add(
-			&buf[0], &carry,
-			to, to_length,
-			&buf[0], 2 * to_length,
-			APMATH_BASE_ZERO);
-#ifdef DEBUG
-		printf("CAL4:\tbuf = ");
-		print_number(buf, total_length);
-#endif
-
 		apmath_base_array_negative(
 			&buf[to_length],
-			to_length,
+			to_length + 1,
 			&buf[to_length],
-			to_length);
+			to_length + 1);
 #ifdef DEBUG
 		printf("CAL5:\tbuf = ");
 		print_number(buf, total_length);
@@ -753,7 +742,7 @@ out:
 		apmath_base_array_add(
 			&buf[to_length], &carry,
 			to, to_length,
-			&buf[to_length], to_length,
+			&buf[to_length], to_length + 1,
 			APMATH_BASE_ZERO);
 #ifdef DEBUG
 		printf("CAL6:\tbuf = ");
@@ -763,7 +752,7 @@ out:
 		apmath_base_array_add(
 			&buf[to_length], &carry,
 			to, to_length,
-			&buf[to_length], to_length,
+			&buf[to_length], to_length + 1,
 			APMATH_BASE_ZERO);
 #ifdef DEBUG
 		printf("CAL7:\tbuf = ");
@@ -1007,9 +996,8 @@ void divide_test()
 
 int test()
 {
-//#define INV_LEN 8
-//#define INV_LEN 100
 #define INV_LEN 10000
+//#define INV_LEN 10000
 	apmath_base_t op1[8];
 	apmath_base_t op2[8];
 	apmath_base_t inv[INV_LEN];
@@ -1051,7 +1039,7 @@ int main()
 	//add_test();
 	//subtract_test();
 	//multiply_test();
-	divide_test();
+	//divide_test();
 
 	//divide_try(0x0100, 0x0001);
 	//divide_try(0x01, 0x01);
@@ -1062,7 +1050,7 @@ int main()
 	//divide_try(97, 35925);
 	//divide_try(97, 29382);
 
-	//test();
+	test();
 
 #if 0
 	*(unsigned int *)op1 = 0xfffeffff;
