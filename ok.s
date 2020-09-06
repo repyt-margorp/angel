@@ -20,5 +20,29 @@ divide:
 	popq	%rbp
 	ret
 	.size	divide, .-divide
+	.section	.rodata
+.LC0:
+	.string	"q, r = %d, %d\n"
+	.text
+	.globl	main
+	.type	main, @function
+main:
+	pushq	%rbp
+	movq	%rsp, %rbp
+	subq	$16, %rsp
+	movl	$4, %esi
+	movl	$3, %edi
+	call	divide
+	movq	%rax, -8(%rbp)
+	movl	-4(%rbp), %edx
+	movl	-8(%rbp), %eax
+	movl	%eax, %esi
+	leaq	.LC0(%rip), %rdi
+	movl	$0, %eax
+	call	printf@PLT
+	movl	$0, %eax
+	leave
+	ret
+	.size	main, .-main
 	.ident	"GCC: (Debian 8.3.0-6) 8.3.0"
 	.section	.note.GNU-stack,"",@progbits
