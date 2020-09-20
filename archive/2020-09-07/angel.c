@@ -1,8 +1,5 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
-#include "apmath.h"
 
 /**
  ****************************************************************
@@ -598,7 +595,7 @@ int number_to(
 	int i;
 
 	for(i = 0; i < len; ++i) {
-//		from->
+		from->
 	}
 }
 int instruction_fetch(struct header *head)
@@ -629,69 +626,10 @@ int instruction_fetch(struct header *head)
 struct header buffer[1000];
 struct header *pool;
 
-int mul(struct header *pool)
-{
-	header_split(pool, sizeof(int), 3);
-	*(int *)USED_DATA(pool) = 0;
-	pool = pool->next;
-
-	header_split(pool, sizeof(int), 3);
-	*(int *)USED_DATA(pool) = 1;
-	pool = pool->next;
-}
-int natural_number(struct header **p_pool)
-{
-	int len;
-	int block;
-	apmath_base_t dig;
-	apmath_base_t buf[16];
-
-	apmath_base_array_zero(buf, 16);
-	while(1) {
-		int c;
-		apmath_base_t ten = 10;
-
-		c = getchar();
-		if(c == ' ') {
-			break;
-		}
-		dig = c - '0';
-		apmath_base_array_resize(
-			buf, 16, &len);
-		memmove(&buf[1], buf, len);
-//		printf("OK1:\t");
-//		print_number(buf, 16);
-		apmath_base_array_multiply(
-			buf, &buf[len],
-			&buf[1], len,
-			&ten, 1);
-//		printf("OK2:\t");
-//		print_number(buf, 16);
-		apmath_base_array_resize(
-			buf, len + 1, &len);
-		apmath_base_array_add(
-			buf, &buf[len],
-			&dig, 1,
-			buf, len,
-			APMATH_BASE_ZERO);
-//		printf("OK3:\t");
-//		print_number(buf, 16);
-	}
-
-	apmath_base_array_resize(buf, len + 1, &len);
-	block = sizeof(int) + sizeof(apmath_base_t) * ((8*len + 7)/8);
-	header_split(*p_pool, block, 3);
-	apmath_base_array_zero(USED_DATA(*p_pool), block);
-	*(int *)USED_DATA(*p_pool) = len;
-	memcpy(&((int *)USED_DATA(*p_pool))[1], buf, sizeof(apmath_base_t) * len);
-	*p_pool = (*p_pool)->next;
-}
-
 int main()
 {
 	struct header *arena, *proc;
 	struct header *head1, *head2, *head3, *head4;
-	struct header *variable;
 	printf("hello, world!\n");
 	printf("sizeof(pointer) = %d\n", sizeof(struct pointer));
 	printf("sizeof(header) = %d\n", sizeof(struct header));
@@ -710,39 +648,16 @@ int main()
 	used_header_set_link(proc, 0, proc);
 #endif
 
-	header_split(pool, 0, 8);
-	variable = pool;
-	pool = pool->next;
-
-	header_split(pool, 8, 1);
-	strcpy(USED_DATA(pool), "add");
-	used_header_set_link(variable, 0, pool);
-	pool = pool->next;
-
-	header_split(pool, 8, 1);
-	strcpy(USED_DATA(pool), "square");
-	used_header_set_link(variable, 1, pool);
-	pool = pool->next;
-
-	header_split(pool, sizeof(int), 3);
-	*(int *)USED_DATA(pool) = 0;
-	pool = pool->next;
-
-	header_split(pool, sizeof(int), 3);
-	*(int *)USED_DATA(pool) = 1;
-	pool = pool->next;
-
-//	header_split(pool, 10, 1); head1 = pool; pool = pool->next;
-//	header_split(pool, 20, 2); head2 = pool; pool = pool->next;
-//	header_split(pool, 30, 3); head3 = pool; pool = pool->next;
-//	used_header_set_link(head1, 0, head2);
-//	used_header_set_link(head2, 0, head1);
-//	used_header_set_link(head3, 0, head1);
+	header_split(pool, 10, 1); head1 = pool; pool = pool->next;
+	header_split(pool, 20, 2); head2 = pool; pool = pool->next;
+	header_split(pool, 30, 3); head3 = pool; pool = pool->next;
+	used_header_set_link(head1, 0, head2);
+	used_header_set_link(head2, 0, head1);
+	used_header_set_link(head3, 0, head1);
 
 	print(buffer);
 	printf("################################\n"); fflush(stdout);
 
-//	migrate(head2, pool); head4 = pool; pool = pool->next;
-//	print(buffer);
-	natural_number(&pool);
+	migrate(head2, pool); head4 = pool; pool = pool->next;
+	print(buffer);
 }

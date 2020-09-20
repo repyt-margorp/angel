@@ -1,10 +1,22 @@
-#include "apmath.h"
+#include <stdio.h>
+#include <string.h>
 
 /**
  ****************************************************************
  *	Arbitrary Precision Mathematics Library
  ****************************************************************
  */
+
+typedef unsigned char apmath_base_t;
+typedef unsigned long apmath_super_t;
+
+#define APMATH_BASE_ZERO		((apmath_base_t) 0)
+#define APMATH_BASE_ONE			((apmath_base_t) 1)
+#define APMATH_BASE_MAX			((apmath_base_t) -1)
+#define APMATH_BASE_BIT_SIZE		(8 * sizeof(apmath_base_t))
+#define APMATH_BASE_BIT_HALF_SIZE	(APMATH_BASE_BIT_SIZE / 2)
+#define APMATH_BASE_FULL		(APMATH_BASE_MAX)
+#define APMATH_BASE_HALF_FULL		(APMATH_BASE_FULL >> APMATH_BASE_BIT_HALF_SIZE)
 
 void print_number(
 	apmath_base_t *array,
@@ -1320,7 +1332,7 @@ int test()
 	printf("res:\t");
 	print_number(res, 4 + INV_LEN);
 }
-#if 0
+
 int main()
 {
 	int i;
@@ -1358,4 +1370,3 @@ int main()
 	print_number(res, 8);
 #endif
 }
-#endif

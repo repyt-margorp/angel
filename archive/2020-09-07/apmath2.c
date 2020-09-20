@@ -1,10 +1,22 @@
-#include "apmath.h"
+#include <stdio.h>
+#include <string.h>
 
 /**
  ****************************************************************
  *	Arbitrary Precision Mathematics Library
  ****************************************************************
  */
+
+typedef unsigned char apmath_base_t;
+typedef unsigned long apmath_super_t;
+
+#define APMATH_BASE_ZERO		((apmath_base_t) 0)
+#define APMATH_BASE_ONE			((apmath_base_t) 1)
+#define APMATH_BASE_MAX			((apmath_base_t) -1)
+#define APMATH_BASE_BIT_SIZE		(8 * sizeof(apmath_base_t))
+#define APMATH_BASE_BIT_HALF_SIZE	(APMATH_BASE_BIT_SIZE / 2)
+#define APMATH_BASE_FULL		(APMATH_BASE_MAX)
+#define APMATH_BASE_HALF_FULL		(APMATH_BASE_FULL >> APMATH_BASE_BIT_HALF_SIZE)
 
 void print_number(
 	apmath_base_t *array,
@@ -466,8 +478,8 @@ int apmath_base_array_multiply(
  *		X*T*b^x <= F*T^2 < (X+1)*T*b^x
  *		X*T*b^(x-c) <= F*T^2/C < (X+1)*T*b^(x-c)
  *		2T-(X+1)*T*b^(x-c) < 2T-F*T^2/C <= 2T-X*T*b^(x-c)
- *		       ||                ||              ||
- *		      LEFT            FIXED PT.         RIGHT
+ *		      ||             ||                ||
+ *		     LEFT          FIXED PT.          RIGHT
  *	Here X*b^x is truncated approximation of F*T. If (x-c) is
  *	equal to or less than (-t), the +1 effect in (X+1) of
  *	LEFT becomes trivial. So set
@@ -490,23 +502,20 @@ int apmath_base_array_multiply(
  *		                FIXED PT.
  *		             LEFT   V           RIGHT
  *		              <-----V-------------|
- *		--------@---------------+---------------+------->
- *		                     ce(LEFT)       ce(RIGHT)
- *		     fl(LEFT)       fl(RIGHT)
+ *		--------+---------------+---------------+------->
+ *		        @            ce(LEFT)       ce(RIGHT)
  *
  *		                        FIXED PT.
  *		             LEFT           V   RIGHT
  *		              <-------------V-----|
- *		--------+---------------@---------------+------->
- *		                     ce(LEFT)       ce(RIGHT)
- *		     fl(LEFT)       fl(RIGHT)
+ *		--------+---------------+---------------+------->
+ *		                    @=ce(LEFT)      ce(RIGHT)
  *
  *		                    FIXED PT.
  *		          LEFT        RIGHT
  *		           <------------V
- *		--------@---------------+---------------+------->
- *		                ce(LEFT)=ce(RIGHT)
- *		     fl(LEFT)       fl(RIGHT)
+ *		--------+---------------+---------------+------->
+ *		        @       ce(LEFT)=ce(RIGHT)
  *	The at-mark(@) shows the solution in this algorithm. From
  *	the figure above, selecting ce(LEFT) not fl(RIGHT) is
  *	suitable for updating newton inverse.
@@ -519,11 +528,11 @@ int apmath_base_array_multiply(
  *	first (f-1) bytes is only to ignore data before the
  *	address t. Truncated data, which is tr(F*T), is denoted
  *	by star(*) below.
- *		ADDR: 0        (t-f+1)        t           2t  msbyte
- *		      V           V           V           V     V
- *		      +---+---+---+---+---+---+---+---+---+   +---+
- *		BUF   |   |  ...  | X |  ...  | X*|  ...* |   | X*|
- *		      +---+---+---+---+---+---+---+---+---+   +---+
+ *		ADDR: 0        (t-f+1)        t           2t 2t+1
+ *		      V           V           V           V   V
+ *		      +---+---+---+---+---+---+---+---+---+---+
+ *		BUF   |   |  ...  | X |  ...  | X*|  ...* | X*|
+ *		      +---+---+---+---+---+---+---+---+---+---+
  *
  *		Next calculate tr(F*T)*T. This is achieved by
  *	multiplication of temporary 'to' and the buffer which was
@@ -535,11 +544,11 @@ int apmath_base_array_multiply(
  *	length of product tr(F*T)*T is (2t+1), so the buffer is
  *	filled up here. The buffer denoted by sharp(#) represents
  *	tr(F*T)*T truncated at t.
- *		ADDR: 0        (t-f+1)        t           2t  msbyte
- *		      V           V           V           V     V
- *		      +---+---+---+---+---+---+---+---+---+   +---+
- *		BUF   | X |  ...  | X |  ...  | X#|  ...# |   | X#|
- *		      +---+---+---+---+---+---+---+---+---+   +---+
+ *		ADDR: 0        (t-f+1)        t           2t 2t+1
+ *		      V           V           V           V   V
+ *		      +---+---+---+---+---+---+---+---+---+---+
+ *		BUF   | X |  ...  | X |  ...  | X#|  ...# | X#|
+ *		      +---+---+---+---+---+---+---+---+---+---+
  *
  *		Currently, we have approximate A(x_n)^2/C at the
  *	buffer with sharp(#) notation, so we negate this value.
@@ -616,17 +625,34 @@ int apmath_base_array_inverse(
 	apmath_base_t *buf)
 {
 	int i;
-	unsigned int to_precision;
-	unsigned int from_precision;
-	unsigned int precision;
-	int gonna_precise;
 	int total_length;
-	apmath_base_t carry; // not used any more probably
+	int from_below;
+	apmath_base_t carry;
 
-	total_length = 2 * to_length;
+/* 1.	If A = 'from' = 0x0100...000, then the newton inverse is
+ *	0x00ff...ff. If so, when the newton method is converging
+ *	from below, overestimation check after tr(F*T) does not
+ *	work properly, because
+ *		F*T = 0x0100...00 * 0x00ff...ff != 0x0100...00
+ *	and the next that comes right after 0x00ff...ff is
+ *	0x0100...000, when truncated yiels t bytes 0x00...00, wow
+ *	zero, decreasing! We need to exclude this case.
+ */
+#if 0
+	if(from[from_length - 1] == APMATH_BASE_ONE) {
+		for(i = from_length - 1; i > 0; --i) {
+			if(from[i - 1] != APMATH_BASE_ZERO) {
+				goto out;
+			}
+		}
+		apmath_base_array_max(to, to_length);
+		return 0;
+	}
+out:
+#endif
 
-/* 1.	Initialization of x_n. x_0 should be set to be strictly
- *	less than the actual inverse of the input. This is a
+/* 2.	Initialization of x_n. x_0 should be set to be strictly
+ *	less than the actual inverse of the value. This is a
  *	conservative method.
  *	Let x be the most significant byte in 'from', which is
  *	from[f-1]. We are going to use only this information to
@@ -640,214 +666,30 @@ int apmath_base_array_inverse(
  *	((b-1)/(x+1))b^(t-1) is easy for computation, and this
  *	becomes 0 if x = b-1, so requires casing.
  */
-//	apmath_base_array_zero(to, to_length);
+	apmath_base_array_zero(to, to_length);
 #if 1
 	if(from[from_length - 1] < APMATH_BASE_MAX) {
-		//apmath_base_array_zero(to, to_length);
 		to[to_length - 1] = APMATH_BASE_MAX
 			/ (from[from_length - 1] + 1);
 	} else {
-		//apmath_base_array_zero(to, to_length);
 		to[to_length - 1] = APMATH_BASE_ONE;
 	}
 #else
 	/* this is super conservative */
-	apmath_base_array_zero(to, to_length);
-	//apmath_base_array_zero(to, to_length - 1);
 	to[to_length - 1] = APMATH_BASE_ONE;
 #endif
 
-#if 1
-	to_precision = 1;
-	from_precision = 1;
-	if(to_length >= 2) {
-		//precision = 2;
-		precision = 1;
-	} else {
-		precision = 1;
-	}
-	gonna_precise = 0;
-#else
-	/* this does not follow precision */
-	to_precision = to_length;
-	from_precision = from_length;
-	precision = to_length;
-	gonna_precise = 1;
-#endif
-	while(to_precision < to_length) {
-		apmath_base_t msbyte;
+	//total_length = 2 * to_length + 1;
+	total_length = 2 * to_length;
 
-		if(gonna_precise) {
-			precision = to_length;
-			to_precision = to_length;
-			from_precision = from_length;
-		} else {
-			to_precision = precision;
-			precision *= 2;
-			if(precision == 0) {
-				/* if hyper big array */
-				precision = -1;
-			}
-			if(precision >= to_length) {
-				gonna_precise = 1;
-				precision = to_length;
-			}
-			if(precision > from_length) {
-				from_precision = from_length;
-			} else {
-				from_precision = precision;
-			}
-			//from_precision = from_length;
-		}
-#ifdef DEBUG
-		printf("to_precision = %x\n", to_precision);
-		printf("from_precision = %x\n", from_precision);
-		printf("precision = %x\n", precision);
-		printf("gonna_precise = %d\n", gonna_precise);
-		printf("PRE0:\tfrom = ");
-		print_number(from, from_length);
-		printf("PRE0:\tto = ");
-		print_number(to, to_length);
-		apmath_base_array_zero(buf, 2*to_length);
-#endif
-
-		apmath_base_array_multiply(
-			&buf[2 * to_length - (to_precision + from_precision - 1)],
-			&msbyte,
-			&to[to_length - to_precision],
-			to_precision,
-			&from[from_length - from_precision],
-			from_precision);
-#ifdef DEBUG
-		printf("msbyte = %d\n", msbyte);
-		printf("PRE1:\tbuf = ");
-		print_number(buf, total_length);
-#endif
-
-		if(from_precision < from_length) {
-			apmath_base_array_add(
-				&buf[2 * to_length - (to_precision + from_precision - 1)],
-				&carry,
-				&to[to_length - to_precision],
-				to_precision,
-				&buf[2 * to_length - (to_precision + from_precision - 1)],
-				to_precision + from_precision - 1,
-				APMATH_BASE_ZERO);
-		} else {
-			apmath_base_array_increment(
-				&buf[(2 * to_length) - to_precision],
-				&carry,
-				&buf[(2 * to_length) - to_precision],
-				to_precision);
-		}
-#ifdef DEBUG
-		printf("PRE2:\tbuf = ");
-		print_number(buf, total_length);
-#endif
-
-		apmath_base_array_multiply(
-			&buf[2 * to_length - 2 * to_precision],
-			&buf[2 * to_length - 1],
-			&buf[(2 * to_length) - to_precision],
-			to_precision,
-			&to[to_length - to_precision],
-			to_precision);
-#ifdef DEBUG
-		printf("PRE3:\tbuf = ");
-		print_number(buf, total_length);
-#endif
-
-		if(msbyte > 0 || carry > 0) {
-			apmath_base_array_add(
-				&buf[(2 * to_length) - to_precision],
-				&carry,
-				&to[to_length - to_precision],
-				to_precision,
-				&buf[(2 * to_length) - to_precision],
-				to_precision,
-				APMATH_BASE_ZERO);
-		}
-#ifdef DEBUG
-		printf("PRE4:\tbuf = ");
-		print_number(buf, total_length);
-#endif
-/*
-		if(msbyte > 0) {
-			apmath_base_array_add(
-				&buf[(2 * to_length) - to_precision],
-				&carry,
-				&to[to_length - to_precision],
-				to_precision,
-				&buf[(2 * to_length) - to_precision],
-				to_precision,
-				APMATH_BASE_ZERO);
-		}
-*/
-
-		apmath_base_array_negate(
-			&buf[(2 * to_length) - precision],
-			&buf[(2 * to_length) - precision],
-			precision);
-#ifdef DEBUG
-		printf("PRE5:\tbuf = ");
-		print_number(buf, total_length);
-#endif
-
-		apmath_base_array_add(
-			&buf[(2 * to_length) - to_precision],
-			&carry,
-			&buf[(2 * to_length) - to_precision],
-			to_precision,
-			&to[to_length - to_precision],
-			to_precision,
-			APMATH_BASE_ZERO);
-#ifdef DEBUG
-		printf("PRE6:\tbuf = ");
-		print_number(buf, total_length);
-#endif
-
-		apmath_base_array_add(
-			&buf[(2 * to_length) - to_precision],
-			&carry,
-			&buf[(2 * to_length) - to_precision],
-			to_precision,
-			&to[to_length - to_precision],
-			to_precision,
-			APMATH_BASE_ZERO);
-#ifdef DEBUG
-		printf("PRE7:\tbuf = ");
-		print_number(buf, total_length);
-#endif
-
-		apmath_base_array_copy(
-			&to[to_length - precision],
-			&buf[(2 * to_length) - precision],
-			precision);
-#ifdef DEBUG
-		printf("PRE9:\tto = ");
-		print_number(to, to_length);
-#endif
-	}
-
-
-/* 2.	Calculation of newton inverse. Loop executes, F*T
+/* 3.	Calculation of newton inverse. Loop executes, F*T
  *	multiplication, a detection of overestimation, F*T^2
  *	multiplication, necessary truncation, negation of F*T^2,
  *	and add T twice, these in this order.
  */
-#ifdef DEBUG
-	printf("to_precision = %x\n", to_precision);
-	printf("from_precision = %x\n", from_precision);
-	printf("precision = %x\n", precision);
-	printf("gonna_precise = %d\n", gonna_precise);
-	printf("PRECAL:\tto = ");
-	print_number(to, to_length);
-#endif
-
-//	for(i = 0; i < 256; ++i) {
-//	for(i = 0; i < 32; ++i) {
-	for(i = 0; i < 16; ++i) {
-		apmath_base_t msbyte;
+	for(i = 0; i < 256; ++i) {
+//	for(i = 0; i < 16; ++i) {
+		//apmath_base_t msbyte;
 
 #ifdef DEBUG
 		printf("i = %d\n", i);
@@ -859,67 +701,48 @@ int apmath_base_array_inverse(
 
 		apmath_base_array_multiply(
 			&buf[to_length - from_length + 1],
-			&msbyte,
-			&to[0],
-			to_length,
-			&from[0],
-			from_length);
+			&buf[2 * to_length],
+			to, to_length,
+			from, from_length);
 #ifdef DEBUG
 		printf("CAL1:\tbuf = ");
 		print_number(buf, total_length);
-		printf("msbyte = %x\n", msbyte);
 #endif
 
-		if(msbyte > 0) {
+		if(buf[2 * to_length] > 0) {
+		//if(msbyte > 0) {
 			apmath_base_array_decrement(
-				&to[0],
-				NULL,
-				&to[0],
-				to_length);
+				to, NULL, to, to_length);
 			break;
 		}
+		apmath_base_array_increment(
+			&buf[to_length], NULL,
+			&buf[to_length], to_length + 1);
+
 		apmath_base_array_multiply(
 			&buf[0],
-			&buf[2 * to_length - 1],
-			&buf[to_length],
-			to_length,
-			&to[0],
-			to_length);
+			&buf[2 * to_length],
+			&buf[to_length], to_length + 1,
+			to, to_length);
 #ifdef DEBUG
 		printf("CAL3:\tbuf = ");
 		print_number(buf, total_length);
 #endif
 
-		apmath_base_array_add(
-			&buf[0],
-			&carry,
-			&to[0],
-			to_length,
-			&buf[0],
-			2 * to_length,
-			APMATH_BASE_ZERO);
-#ifdef DEBUG
-		printf("CAL4:\tbuf = ");
-		print_number(buf, total_length);
-#endif
-
 		apmath_base_array_negative(
 			&buf[to_length],
-			to_length,
+			to_length + 1,
 			&buf[to_length],
-			to_length);
+			to_length + 1);
 #ifdef DEBUG
 		printf("CAL5:\tbuf = ");
 		print_number(buf, total_length);
 #endif
 
 		apmath_base_array_add(
-			&buf[to_length],
-			&carry,
-			&to[0],
-			to_length,
-			&buf[to_length],
-			to_length,
+			&buf[to_length], &carry,
+			to, to_length,
+			&buf[to_length], to_length + 1,
 			APMATH_BASE_ZERO);
 #ifdef DEBUG
 		printf("CAL6:\tbuf = ");
@@ -927,12 +750,9 @@ int apmath_base_array_inverse(
 #endif
 
 		apmath_base_array_add(
-			&buf[to_length],
-			&carry,
-			&to[0],
-			to_length,
-			&buf[to_length],
-			to_length,
+			&buf[to_length], &carry,
+			to, to_length,
+			&buf[to_length], to_length + 1,
 			APMATH_BASE_ZERO);
 #ifdef DEBUG
 		printf("CAL7:\tbuf = ");
@@ -944,8 +764,7 @@ int apmath_base_array_inverse(
 		}
 
 		apmath_base_array_copy(
-			&to[0],
-			&buf[to_length],
+			to, &buf[to_length],
 			to_length);
 #ifdef DEBUG
 		printf("CAL9:\tto = ");
@@ -954,7 +773,7 @@ int apmath_base_array_inverse(
 	}
 
 	if(i >= 16) {
-		printf("over: i=%d; ", i);
+		printf("over: ");
 		print_number(from, from_length);
 	}
 
@@ -962,73 +781,6 @@ int apmath_base_array_inverse(
 	printf("LAST:\tto = ");
 	print_number(to, to_length);
 #endif
-}
-int apmath_base_array_safe_inverse(
-	apmath_base_t *to,
-	int to_length,
-	apmath_base_t *from,
-	int from_length,
-	apmath_base_t *buf)
-{
-	int i;
-	apmath_base_t carry;
-
-	apmath_base_array_inverse(
-		to, to_length,
-		from, from_length,
-		buf);
-
-	apmath_base_array_multiply(
-		&buf[0],
-		&buf[from_length + to_length - 1],
-		to, to_length,
-		from, from_length);
-	for(i = 0; i < to_length; ++i) {
-		if(i < to_length - 1) {
-			if(buf[from_length + i] == APMATH_BASE_MAX) {
-				continue;
-			}
-		} else {
-			if(buf[from_length + i] == APMATH_BASE_ZERO) {
-				continue;
-			}
-		}
-		printf("# inverse error:\n");
-		printf("from(len = %d):\n", from_length);
-		print_number(from, from_length);
-		printf("to(len = %d):\n", to_length);
-		print_number(to, to_length);
-		printf("one:\n");
-		print_number(buf, from_length + to_length);
-		return 1;
-	}
-
-	apmath_base_array_add(
-		&buf[0], &carry,
-		from, from_length,
-		&buf[0], from_length + to_length,
-		APMATH_BASE_ZERO);
-	for(i = 0; i < to_length; ++i) {
-		if(i < to_length - 1) {
-			if(buf[from_length + i] == APMATH_BASE_ZERO) {
-				continue;
-			}
-		} else {
-			if(buf[from_length + i] == APMATH_BASE_ONE) {
-				continue;
-			}
-		}
-		printf("# inverse error:\n");
-		printf("from(len = %d):\n", from_length);
-		print_number(from, from_length);
-		printf("to(len = %d):\n", to_length);
-		print_number(to, to_length);
-		printf("one++:\n");
-		print_number(buf, from_length + to_length);
-		return 1;
-	}
-
-	return 0;
 }
 
 /**
@@ -1137,48 +889,6 @@ void multiply_test()
 	}
 }
 
-int inverse_try(unsigned int x)
-{
-#define INVERSE_LENGTH 100
-	unsigned int i;
-	apmath_base_t op[sizeof(int)];
-	apmath_base_t inv[INVERSE_LENGTH];
-	apmath_base_t buf[INVERSE_LENGTH * 2];
-	int prec[] = { 8, 16, 32, 64 };
-	int len;
-
-	*(unsigned int *)op = x;
-	apmath_base_array_resize(op, sizeof(int), &len);
-	prec[0] = len;
-	prec[1] = len + 1;
-	for(i = 0; i < sizeof(prec) / sizeof(int); ++i) {
-		if(apmath_base_array_safe_inverse(
-			inv, prec[i],
-			op, len,
-			buf))
-		{
-			return 1;
-		}
-	}
-
-	return 0;
-}
-void inverse_test()
-{
-	unsigned int i, j;
-
-	for(i = 0; i < 0x1000000; ++i) {
-
-		if(i % (0x1000000 / 100) == 0) {
-			printf("%d/100 finished\n",
-				i / (0x1000000 / 100));
-		}
-		if(inverse_try(i + 1)) {
-			return;
-		}
-	}
-}
-
 int divide_try(
 	unsigned int x,
 	unsigned int y)
@@ -1197,8 +907,7 @@ int divide_try(
 	apmath_base_array_resize(op1, sizeof(int), &len1);
 	apmath_base_array_resize(op2, sizeof(int), &len2);
 
-	apmath_base_array_safe_inverse(
-	//apmath_base_array_inverse(
+	apmath_base_array_inverse(
 		inv, len1 + 1,
 		op2, len2,
 		buf);
@@ -1287,22 +996,20 @@ void divide_test()
 
 int test()
 {
-//#define INV_LEN 8
-//#define INV_LEN 100
 #define INV_LEN 10000
+//#define INV_LEN 10000
 	apmath_base_t op1[8];
 	apmath_base_t op2[8];
 	apmath_base_t inv[INV_LEN];
 	apmath_base_t res[INV_LEN * 2];
-	apmath_base_t buf[INV_LEN * 2];
+	apmath_base_t buf[INV_LEN * 2 + 1];
 
 //	((unsigned int *)op1)[0] = 1;
 //	((unsigned int *)op1)[0] = 10000;
 	((unsigned int *)op1)[0] = 0xa3bed297;
 //	((unsigned int *)op1)[1] = 0x910ecc88;
 
-	//apmath_base_array_inverse(
-	apmath_base_array_safe_inverse(
+	apmath_base_array_inverse(
 		inv, INV_LEN,
 		op1, 4, //op1, 8,
 		buf);
@@ -1320,7 +1027,7 @@ int test()
 	printf("res:\t");
 	print_number(res, 4 + INV_LEN);
 }
-#if 0
+
 int main()
 {
 	int i;
@@ -1332,21 +1039,18 @@ int main()
 	//add_test();
 	//subtract_test();
 	//multiply_test();
-	inverse_test();
 	//divide_test();
-
-	//inverse_try(0x10);
-	//inverse_try(0x80);
-	//inverse_try(0xff);
-	//inverse_try(0x02c0);
-	//inverse_try(0xffff00);
-	//inverse_try(0x02ddc6);
 
 	//divide_try(0x0100, 0x0001);
 	//divide_try(0x01, 0x01);
 	//divide_try(0xff, 0xff);
+	//divide_try(0x102, 0x103);
+	//divide_try(0x1f4, 0x1f4);
+	//divide_try(97, 4097);
+	//divide_try(97, 35925);
+	//divide_try(97, 29382);
 
-	//test();
+	test();
 
 #if 0
 	*(unsigned int *)op1 = 0xfffeffff;
@@ -1358,4 +1062,3 @@ int main()
 	print_number(res, 8);
 #endif
 }
-#endif
