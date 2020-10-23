@@ -16,39 +16,45 @@ typedef unsigned long apmath_super_t;
 #define APMATH_BASE_ZERO		((apmath_base_t) 0)
 #define APMATH_BASE_ONE			((apmath_base_t) 1)
 #define APMATH_BASE_MAX			((apmath_base_t) -1)
-#define APMATH_BASE_BIT_LENGTH		(8 * sizeof(apmath_base_t))
-#define APMATH_BASE_HALF_BIT_LENGTH	(APMATH_BASE_BIT_SIZE / 2)
+#define APMATH_BASE_BIT_SIZE		(8 * sizeof(apmath_base_t))
+#define APMATH_BASE_BIT_HALF_SIZE	(APMATH_BASE_BIT_SIZE / 2)
 #define APMATH_BASE_FULL		(APMATH_BASE_MAX)
 #define APMATH_BASE_HALF_FULL		(APMATH_BASE_FULL >> APMATH_BASE_BIT_HALF_SIZE)
-
-#define APMATH_SUPER_ZERO		((apmath_super_t) 0)
-#define APMATH_SUPER_ONE		((apmath_super_t) 1)
-#define APMATH_SUPER_MAX		((apmath_super_t) -1)
-#define APMATH_SUPER_BIT_LENGTH		(8 * sizeof(apmath_super_t))
-#define APMATH_SUPER_HALF_BIT_LENGTH	(APMATH_SUPER_BIT_SIZE / 2)
-#define APMATH_SUPER_FULL		(APMATH_SUPER_MAX)
-#define APMATH_SUPER_HALF_FULL		(APMATH_SUPER_FULL >> APMATH_SUPER_BIT_HALF_SIZE)
 
 void print_number(
 	apmath_base_t *array,
 	int length);
-
-/**
- ****************************************************************
- *
- ****************************************************************
- */
 int apmath_base_array_resize(
-	int *length,
 	apmath_base_t *array,
-	int max_length);
-
+	int max_length,
+	int *length);
 int apmath_base_array_compare(
 	int *res,
 	apmath_base_t *left,
 	int left_length,
 	apmath_base_t *right,
 	int right_length);
+int apmath_base_increment(
+	apmath_base_t *result,
+	apmath_base_t *carry_out,
+	apmath_base_t operand);
+int apmath_base_decrement(
+	apmath_base_t *result,
+	apmath_base_t *carry_out,
+	apmath_base_t operand);
+
+int apmath_base_add(
+	apmath_base_t *result,
+	apmath_base_t *carry_out,
+	apmath_base_t operand1,
+	apmath_base_t operand2,
+	apmath_base_t carry_in);
+
+/**
+ ****************************************************************
+ *
+ ****************************************************************
+ */
 
 int apmath_base_array_zero(
 	apmath_base_t *array,
@@ -56,8 +62,22 @@ int apmath_base_array_zero(
 int apmath_base_array_max(
 	apmath_base_t *array,
 	int length);
-
 int apmath_base_array_copy(
+	apmath_base_t *to,
+	apmath_base_t *from,
+	int length);
+int apmath_base_array_extend(
+	apmath_base_t *to,
+	int to_length,
+	apmath_base_t *from,
+	int from_length);
+
+/**
+ ****************************************************************
+ *
+ ****************************************************************
+ */
+int apmath_base_array_negate(
 	apmath_base_t *to,
 	apmath_base_t *from,
 	int length);
@@ -67,14 +87,6 @@ int apmath_base_array_copy(
  *
  ****************************************************************
  */
-int apmath_base_increment(
-	apmath_base_t *result,
-	apmath_base_t *carry_out,
-	apmath_base_t operand);
-int apmath_base_decrement(
-	apmath_base_t *result,
-	apmath_base_t *carry_out,
-	apmath_base_t operand);
 
 int apmath_base_array_increment(
 	apmath_base_t *result,
@@ -86,19 +98,6 @@ int apmath_base_array_decrement(
 	apmath_base_t *carry_out,
 	apmath_base_t *operand,
 	int operand_length);
-
-/**
- ****************************************************************
- *
- ****************************************************************
- */
-int apmath_base_add(
-	apmath_base_t *result,
-	apmath_base_t *carry_out,
-	apmath_base_t operand1,
-	apmath_base_t operand2,
-	apmath_base_t carry_in);
-
 int apmath_base_array_add(
 	apmath_base_t *result,
 	apmath_base_t *carry_out,
@@ -107,24 +106,11 @@ int apmath_base_array_add(
 	apmath_base_t *long_operand,
 	int long_operand_length,
 	apmath_base_t carry_in);
-
-/**
- ****************************************************************
- *
- ****************************************************************
- */
-int apmath_base_array_negate(
-	apmath_base_t *to,
-	int to_length,
-	apmath_base_t *from,
-	int from_length);
-
 int apmath_base_array_negative(
 	apmath_base_t *to,
 	int to_length,
 	apmath_base_t *from,
 	int from_length);
-
 /**
  ****************************************************************
  *
@@ -135,7 +121,6 @@ int apmath_base_multiply(
 	apmath_base_t *upper,
 	apmath_base_t operand1,
 	apmath_base_t operand2);
-
 int apmath_base_array_multiply(
 	apmath_base_t *result,
 	apmath_base_t *carry_out,
@@ -143,7 +128,6 @@ int apmath_base_array_multiply(
 	int short_operand_length,
 	apmath_base_t *long_operand,
 	int long_operand_length);
-
 /**
  ****************************************************************
  *		Newton inverse is calculated along aproximating

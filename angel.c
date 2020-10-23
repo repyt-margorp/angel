@@ -2,325 +2,52 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "funlist.h"
 #include "apmath.h"
 
-/**
+/*
  ****************************************************************
- */
-int list_init(
-	void *link_param,
-	int (*link)(void *, void *, void ***),
-	void *ptr,
-	void *sen)
-{
-	void **ptr_link;
-
-	if(link(link_param, ptr, &ptr_link)) {
-		return 1;
-	}
-
-	*ptr_link = sen;
-
-	return 0;
-}
-int list_is_terminated(
-	void *link_param,
-	int (*link)(void *, void *, void ***),
-	void *ptr,
-	void *sen,
-	int *res)
-{
-	void **ptr_link;
-
-	if(link(link_param, ptr, &ptr_link)) {
-		return 1;
-	}
-
-	if(*ptr_link == sen) {
-		*res = 1;
-	} else {
-		*res = 0;
-	}
-
-	return 0;
-}
-int list_function_map(
-	void *link_param,
-	int (*link)(void *, void *, void ***),
-	void *func_param,
-	int (*func)(void *, void *),
-	void *ptr,
-	void *sen)
-{
-	void *temp;
-	int is_terminated;
-
-	temp = ptr;
-	while(1) {
-		void **p_temp;
-
-		if(func(func_param, temp)) {
-			return 1;
-		}
-		if(link(link_param, temp, &p_temp)) {
-			return 1;
-		}
-		temp = *p_temp;
-
-		if(list_is_terminated(
-			link_param, link, ptr, sen,
-			&is_terminated))
-		{
-			return 1;
-		}
-		if(is_terminated) {
-			break;
-		}
-	}
-
-	return 0;
-}
-
-int cyclic_list_init(
-	void *prev_param,
-	int (*prev)(void *, void *, void ***),
-	void *next_param,
-	int (*next)(void *, void *, void ***),
-	void *ptr)
-{
-	void **ptr_prev, **ptr_next;
-
-	list_init(
-		prev_param, prev,
-		ptr, ptr);
-	list_init(
-		next_param, next,
-		ptr, ptr);
-
-	return 0;
-}
-/**
- ****************************************************************
- * @fn
- *	Two loops of pointers are concatenated. Nodes in loops
- *	are denoded P and Q. Links to be broken are
- *		... P --> next_P ...
- *		... prev_Q --> Q ...
- *	and those to be constructed are
- *		... P --> Q ...
- *		... prev_Q --> next_P ...
- *	When two ditinct loops
- *		    ...  next_P   prev_Q  ...
- *		  .        ^         |        .
- *		  .        |         |        .
- *		  .        |         V        .
- *		prev_P --> P         Q --> next_Q
- *	are conatenated, the result is
- *		  ... next_P <-- prev_Q ...
- *		  .                       .
- *		  .                       .
- *		  .                       .
- *		prev_P --> P --> Q --> next_Q
- *	In constrast, a single loop structure
- *                  ...   ...   ...   ...   ...
- *		  .                             .
- *		  .         ... ... ...         .
- *		  .        ^           |        .
- *		  .      next_P     prev_Q      .
- *		  .        |           V        .
- *		prev_P --> P           Q --> next_Q
- *	is converted into two loops.
- *                  ...   ...   ...   ...   ...
- *		  .                             .
- *		  .         ... ... ...         .
- *		  .        ^           V        .
- *		  .      next_P <-- prev_Q      .
- *		  .                             .
- *		prev_P --> P    -->    Q --> next_Q
- * @param (param)
- *	Parameter for get-functions for prev and next.
- * @param (prev)
- *	Get-function for prev.
- * @param (next)
- *	Get-function for next.
- * @param (ptr)
- *	Node to come before qtr.
- * @param (1tr)
- *	Node to come after ptr.
- * @return
- *	0 for success. Otherwise non-zero.
- ****************************************************************
- */
-int cyclic_list_insert(
-	void *prev_param,
-	int (*prev)(void *, void *, void ***),
-	void *next_param,
-	int (*next)(void *, void *, void ***),
-	void *ptr,
-	void *qtr)
-{
-	void **ptr_prev, **ptr_next;
-	void **qtr_prev, **qtr_next;
-	void **ptr_next_prev, **qtr_prev_next;
-
-/* 1.	Get the fields.
- */
-	if(prev(prev_param, ptr, &ptr_prev)) {
-		return 1;
-	}
-	if(next(next_param, ptr, &ptr_next)) {
-		return 1;
-	}
-	if(prev(prev_param, qtr, &qtr_prev)) {
-		return 1;
-	}
-	if(next(next_param, qtr, &qtr_next)) {
-		return 1;
-	}
-	if(prev(prev_param, *ptr_next, &ptr_next_prev)) {
-		return 1;
-	}
-	if(next(next_param, *qtr_prev, &qtr_prev_next)) {
-		return 1;
-	}
-
-/* 2.	P->next is reffered and substituted.
- *	P->next->prev is substituted.
- *	Q->prev is reffered and substituted.
- *	Q->prev->next is substituted.
- *	Reffered pointer variables must be read firstly. 
- *	In other words, only substituted pointer variables
- *	should be substituted in advance.
- */
-	*ptr_next_prev = *qtr_prev;	// ptr->next->prev = qtr->prev;
-	*qtr_prev_next = *ptr_next;	// qtr->prev->next = ptr->next;
-	*ptr_next = qtr;		// ptr->next = qtr;
-	*qtr_prev = ptr;		// qtr->prev = ptr;
-
-	return 0;
-};
-
-struct pointer {
-	struct pointer *prev;
-	struct pointer *next;
-	void *memory;
-};
-int pointer_prev(
-	void *param,
-	void *ptr,
-	void ***p_prev)
-{
-	if(ptr == NULL || p_prev == NULL) {
-		return 1;
-	}
-
-	*p_prev = (void **)&((struct pointer *)ptr)->prev;
-
-	return 0;
-}
-int pointer_next(
-	void *param,
-	void *ptr,
-	void ***p_next)
-{
-	if(ptr == NULL || p_next == NULL) {
-		return 1;
-	}
-
-	*p_next = (void **)&((struct pointer *)ptr)->next;
-
-	return 0;
-}
-
-int pointer_set(
-	void *mem,
-	void *ptr)
-{
-	if(ptr == NULL) {
-		return 1;
-	}
-
-	((struct pointer *)ptr)->memory = mem;
-
-	return 0;
-}
-
-/**
  ****************************************************************
  */
 
-struct header {
-	struct header *prev;
-	struct header *next;
+struct angel_header {
+	struct angel_header *prev;
+	struct angel_header *next;
 	int flag;
 };
-struct used {
-	struct pointer *link;
-	struct pointer *angel;
-};
-struct freed {
-	struct header *backward;
-	struct header *forward;
-};
-#define USED(head)	((struct used *)&((struct header *)head)[1])
-#define USED_DATA(head)	(void *)(&USED(head)[1])
-#define USED_LINK(head)	(USED(head)->link)
-#define FREED(head)	((struct freed *)&((struct header *)head)[1])
 
-int header_prev(
+int angel_header_prev(
 	void *param,
-	void *head,
-	void ***p_prev)
+	void *lst,
+	void ***p_link)
 {
-	if(head == NULL || p_prev == NULL) {
+	struct angel_header *head = (struct angel_header *)lst;
+
+	if(lst == NULL || p_link == NULL) {
 		return 1;
 	}
 
-	*p_prev = (void **)&((struct header *)head)->prev;
+	*p_link = (void **)&head->prev;
 
 	return 0;
 }
-int header_next(
+int angel_header_next(
 	void *param,
-	void *head,
-	void ***p_next)
+	void *lst,
+	void ***p_link)
 {
-	if(head == NULL || p_next == NULL) {
+	struct angel_header *head = (struct angel_header *)lst;
+
+	if(lst == NULL || p_link == NULL) {
 		return 1;
 	}
 
-	*p_next = (void **)&((struct header *)head)->next;
-
-	return 0;
-}
-int freed_header_prev(
-	void *param,
-	void *head,
-	void ***p_prev)
-{
-	if(head == NULL || p_prev == NULL) {
-		return 1;
-	}
-
-	*p_prev = (void **)&FREED(head)->backward;
-
-	return 0;
-}
-int freed_header_next(
-	void *param,
-	void *head,
-	void ***p_next)
-{
-	if(head == NULL || p_next == NULL) {
-		return 1;
-	}
-
-	*p_next = (void **)&FREED(head)->forward;
+	*p_link = (void **)&head->next;
 
 	return 0;
 }
 
-int header_size(struct header *head)
+int angel_header_size(struct angel_header *head)
 {
 	int size;
 
@@ -329,48 +56,93 @@ int header_size(struct header *head)
 	return size;
 }
 
-int is_used(struct header *head)
+/*
+ ****************************************************************
+ ****************************************************************
+ */
+
+struct free {
+	struct angel_header *backward;
+	struct angel_header *forward;
+};
+struct lock {
+	struct funlist_cyclic_pointer *angel_ring;
+	struct funlist_cyclic_pointer *link;
+};
+#define FREE(head)	((struct free *)&((struct angel_header *)head)[1])
+#define LOCK(head)	((struct lock *)&((struct angel_header *)head)[1])
+#define LOCK_DATA(head)	(void *)(&LOCK(head)[1])
+#define LOCK_LINK(head)	(LOCK(head)->link)
+
+int angel_free_header_prev(
+	void *param,
+	void *lst,
+	void ***p_link)
 {
-	if((char *)USED(head)->link > (char *)head
-		&& (char *)USED(head)->link < (char *)head->next)
+	if(lst == NULL || p_link == NULL) {
+		return 1;
+	}
+
+	*p_link = (void **)&FREE(lst)->backward;
+
+	return 0;
+}
+int angel_free_header_next(
+	void *param,
+	void *lst,
+	void ***p_link)
+{
+	if(lst == NULL || p_link == NULL) {
+		return 1;
+	}
+
+	*p_link = (void **)&FREE(lst)->forward;
+
+	return 0;
+}
+
+int is_lock(struct angel_header *head)
+{
+	if((char *)LOCK(head)->link > (char *)head
+		&& (char *)LOCK(head)->link < (char *)head->next)
 	{
 		return 1;
 	}
 	return 0;
 }
 
-int used_header_link(struct header *head)
+int angel_lock_header_link(struct angel_header *head)
 {
 	int link;
 
-	link = (struct pointer *)head->next - USED_LINK(head);
+	link = (struct funlist_cyclic_pointer *)head->next - LOCK_LINK(head);
 
 	return link;
 }
-int used_header_size(struct header *head)
+int angel_lock_header_size(struct angel_header *head)
 {
 	int size;
 
-	size = (char *)USED(head)->link
-		- (char *)USED_DATA(head);
+	size = (char *)LOCK(head)->link
+		- (char *)LOCK_DATA(head);
 
 	return size;
 }
 
-int print(struct header *head)
+int print(struct angel_header *head)
 {
-	struct header *temp;
+	struct angel_header *temp;
 
 	temp = head;
 	while(temp != NULL) {
 		int i;
 		int use;
 
-		use = is_used(temp);
+		use = is_lock(temp);
 		if(use) {
-			printf("USED");
+			printf("LOCK");
 		} else {
-			printf("FREED");
+			printf("FREE");
 		}
 		printf("(%x): prev(%x), next(%x), flag(%x)\n",
 			temp, temp->prev, temp->next, temp->flag);
@@ -379,25 +151,25 @@ int print(struct header *head)
 			int size;
 			int link;
 
-			size = used_header_size(temp);
-			link = used_header_link(temp);
+			size = angel_lock_header_size(temp);
+			link = angel_lock_header_link(temp);
 			printf("\tsize, link, angel = %d, %d, %x\n",
-				size, link, USED(temp)->angel);
+				size, link, LOCK(temp)->angel_ring);
 			for(i = 0; i < link; ++i) {
 				printf("\tlink[%d](%x): prev(%x), next(%x), memory(%x)\n",
-					i, &USED(temp)->link[i],
-					USED(temp)->link[i].prev,
-					USED(temp)->link[i].next,
-					USED(temp)->link[i].memory);
+					i, &LOCK(temp)->link[i],
+					LOCK(temp)->link[i].prev,
+					LOCK(temp)->link[i].next,
+					LOCK(temp)->link[i].pointer);
 			}
 		} else {
 			int size;
 
-			size = header_size(temp);
+			size = angel_header_size(temp);
 			printf("\tsize = %d\n", size);
 			printf("\tbackward(%x), forward(%x)\n",
-				FREED(temp)->backward,
-				FREED(temp)->forward);
+				FREE(temp)->backward,
+				FREE(temp)->forward);
 		}
 		temp = temp->next;
 	}
@@ -407,66 +179,89 @@ int print(struct header *head)
  ****************************************************************
  */
 
-int header_init(struct header *head, int size)
+int angel_free_header_init(
+	struct angel_header *head,
+	int size)
 {
-	head->prev = NULL;
-	head->next = (struct header *)((char *)head + size);
-	cyclic_list_init(
-		NULL, freed_header_prev,
-		NULL, freed_header_next,
+	//head->prev = NULL;
+	funlist_list_init(
+		NULL,
+		angel_header_prev,
+		head,
+		NULL);
+	//head->next = (struct angel_header *)((char *)head + size);
+	funlist_list_init(
+		NULL,
+		angel_header_next,
+		head,
+		(char *)head + size);
+
+	funlist_cyclic_list_init(
+		NULL, angel_free_header_prev,
+		NULL, angel_free_header_next,
 		head);
+
+	return 0;
 }
 
-int header_trim(struct header *head, int size)
+int angel_free_header_trim(
+	struct angel_header *head,
+	int size)
 {
-	struct header *tail;
+	struct angel_header *tail;
 
-	tail = (struct header *)((char *)&head[1] + size);
+	tail = (struct angel_header *)
+		((char *)&head[1] + size);
 	tail->next = head->next;
 	head->next = tail;
 
-	cyclic_list_insert(
-		NULL, freed_header_prev,
-		NULL, freed_header_next,
+	funlist_cyclic_list_insert(
+		NULL, angel_free_header_prev,
+		NULL, angel_free_header_next,
 		head, head);
 
-	cyclic_list_init(
-		NULL, freed_header_prev,
-		NULL, freed_header_next,
+	funlist_cyclic_list_init(
+		NULL, angel_free_header_prev,
+		NULL, angel_free_header_next,
 		tail);
+
+	return 0;
 }
 
-int header_split(struct header *head, int size, int length)
+int angel_header_split(
+	struct angel_header *head,
+	int size,
+	int length)
 {
 	int i;
-	struct pointer *link;
-	struct header *tail;
+	struct funlist_cyclic_pointer *link;
+	struct angel_header *tail;
 
-	cyclic_list_insert(
-		NULL, freed_header_prev,
-		NULL, freed_header_next,
+	funlist_cyclic_list_insert(
+		NULL, angel_free_header_prev,
+		NULL, angel_free_header_next,
 		head, head);
 
-	link = (struct pointer *)((char *)USED_DATA(head) + size);
+	link = (struct funlist_cyclic_pointer *)((char *)LOCK_DATA(head) + size);
 
-	header_trim(head, sizeof(struct used) + size +
-		sizeof(struct pointer) * length);
+	angel_free_header_trim(head, sizeof(struct lock) + size +
+		sizeof(struct funlist_cyclic_pointer) * length);
 
-	USED(head)->link = link;
-	USED(head)->angel = NULL;
+	LOCK(head)->link = link;
+	LOCK(head)->angel_ring = NULL;
 
 	for(i = 0; i < length; ++i) {
-		cyclic_list_init(
-			NULL, pointer_prev,
-			NULL, pointer_next,
+		funlist_cyclic_list_init(
+			NULL, funlist_cyclic_pointer_prev,
+			NULL, funlist_cyclic_pointer_next,
 			&link[i]);
-		link[i].memory = NULL;
+		link[i].pointer = NULL;
 	}
 }
 
 /**
  ****************************************************************
- * @fn
+ * @details
  *	The structure of angel ring is
  *		    ... ... ... ... ... ... ...
  *		    V                         ^
@@ -477,12 +272,16 @@ int header_split(struct header *head, int size, int length)
  *		               target
  ****************************************************************
  */
-int used_header_set_link(struct header *head, int n, struct header *object)
+int angel_lock_header_set_link(
+	struct angel_header *head,
+	int n,
+	struct angel_header *object)
 {
 	int is_single;
-	struct header *target;
+	struct angel_header *target;
 
-/* 1.	The link[n] is refreshed. The content link[n].memory are
+/**
+ * 1.	The link[n] is refreshed. The content link[n].memory are
  *	going to be deleted. Before the delete, confirm that the
  *	link[n] is not directly pointed from the pointing object
  *	(target), that is, link[n] is not saved in the field
@@ -496,32 +295,33 @@ int used_header_set_link(struct header *head, int n, struct header *object)
  *	completing the update of angel, kick out link[n] from the
  *	angel ring.
  */
-	target = USED(head)->link[n].memory;
+	target = LOCK(head)->link[n].pointer;
 	if(target != NULL) {
-		if(USED(target)->angel == &USED(head)->link[n]) {
-			list_is_terminated(NULL,
-				pointer_prev,
-				&USED(head)->link[n],
-				&USED(head)->link[n],
+		if(LOCK(target)->angel_ring == &LOCK(head)->link[n]) {
+			funlist_list_is_last(NULL,
+				funlist_cyclic_pointer_prev,
+				&LOCK(head)->link[n],
+				&LOCK(head)->link[n],
 				&is_single);
 
 			if(is_single) {
-				USED(target)->angel = NULL;
+				LOCK(target)->angel_ring = NULL;
 			} else {
 				// Angel becomes next of link[n], which is
 				// relatively old reference to the target.
-				USED(target)->angel =
-					USED(head)->link[n].next;
+				LOCK(target)->angel_ring =
+					LOCK(head)->link[n].next;
 			}
 		}
 	}
-	cyclic_list_insert(
-		NULL, pointer_prev,
-		NULL, pointer_next,
-		&USED(head)->link[n],
-		&USED(head)->link[n]);
+	funlist_cyclic_list_insert(
+		NULL, funlist_cyclic_pointer_prev,
+		NULL, funlist_cyclic_pointer_next,
+		&LOCK(head)->link[n],
+		&LOCK(head)->link[n]);
 
-/* 2.	The content of link[n] is settled. The substituded
+/**
+ * 2.	The content of link[n] is settled. The substituded
  *	value is the input object. The input object is empty,
  *	or object is newly referred, the topology of pointer
  *	should remain initialized, so the pointer remains to
@@ -535,214 +335,126 @@ int used_header_set_link(struct header *head, int n, struct header *object)
  *	newly referred, the angel must also registered for
  *	the first time.
  */
-	USED(head)->link[n].memory = object;
+	LOCK(head)->link[n].pointer = object;
 	if(object != NULL) {
-		if(USED(object)->angel != NULL) {
+		if(LOCK(object)->angel_ring != NULL) {
 			// link[n] is located just before angel, which is
 			// the latest reference to the object.
-			cyclic_list_insert(
-				NULL, pointer_prev,
-				NULL, pointer_next,
-				&USED(head)->link[n],
-				USED(object)->angel);
+			funlist_cyclic_list_insert(
+				NULL, funlist_cyclic_pointer_prev,
+				NULL, funlist_cyclic_pointer_next,
+				&LOCK(head)->link[n],
+				LOCK(object)->angel_ring);
 			return 0;
 		}
-		USED(object)->angel = &USED(head)->link[n];
+		LOCK(object)->angel_ring = &LOCK(head)->link[n];
 	}
 #if 0
 	// No need because link[n] is initialized at the
 	// last of phase 1, when link[n] is omitted.
-	cyclic_list_init(
-		NULL, pointer_prev,
-		NULL, pointer_next,
-		&USED(head)->link[n]);
+	funlist_cyclic_list_init(
+		NULL, funlist_cyclic_pointer_prev,
+		NULL, funlist_cyclic_pointer_next,
+		&LOCK(head)->link[n]);
 #endif
 
 	return 0;
 }
 
 int migrate(
-	struct header *from,
-	struct header *to)
+	struct angel_header *from,
+	struct angel_header *to)
 {
 	int i;
 	int length;
 	int size;
-	struct pointer *temp;
+	struct funlist_cyclic_pointer *temp;
 
-	length = used_header_link(from);
-	size = used_header_size(from);
-	header_split(to, size, length);
+	length = angel_lock_header_link(from);
+	size = angel_lock_header_size(from);
+	angel_header_split(to, size, length);
 
-	list_function_map(
-		NULL, pointer_prev,
-		to, pointer_set,
-		USED(from)->angel,
-		USED(from)->angel);
+	funlist_list_map(
+		NULL,				// link_param
+		funlist_cyclic_pointer_prev,	// link
+		to,				// func_param
+		funlist_cyclic_pointer_set,	// func
+		NULL,				// cond_param
+		funlist_default_condition,	// cond
+		LOCK(from)->angel_ring,		// lst
+		LOCK(from)->angel_ring,		// sen
+		NULL);				// last
 
-	USED(to)->angel = USED(from)->angel;
-	USED(from)->angel = NULL;
+	LOCK(to)->angel_ring = LOCK(from)->angel_ring;
+	LOCK(from)->angel_ring = NULL;
 
 	for(i = 0; i < length; ++i) {
-		used_header_set_link(to, i, USED(from)->link[i].memory);
-		used_header_set_link(from, i, NULL);
+		angel_lock_header_set_link(to, i, LOCK(from)->link[i].pointer);
+		angel_lock_header_set_link(from, i, NULL);
 	}
 }
 
-int number_to(
-	char *from,
-	int len,
-	char *to,
-	int p_len)
-{
-	int i;
+struct angel_header buffer[1000];
+struct angel_header *pool;
 
-	for(i = 0; i < len; ++i) {
-//		from->
-	}
-}
-int instruction_fetch(struct header *head)
-{
-	int i;
-
-	switch(*(char *)USED_DATA(head)) {
-	case 0x00: // NOP: nop
-		break;
-	case 0x01: // NEW: new x
-		break;
-	case 0x02: // LOAD: lode i j k
-		break;
-	case 0x03: // STORE: store i j k
-		break;
-	default:
-		break;
-	}
-}
-
-//
-//	LOAD: load i j k;
-//	set_link(proc, i, proc->link[j].memory->link[j].memory);
-//	STORE: store i j k;
-//	set_link(proc, proc->link[j].memory->link[k].memory, i);
-//
-
-struct header buffer[1000];
-struct header *pool;
-
-int mul(struct header *pool)
-{
-	header_split(pool, sizeof(int), 3);
-	*(int *)USED_DATA(pool) = 0;
-	pool = pool->next;
-
-	header_split(pool, sizeof(int), 3);
-	*(int *)USED_DATA(pool) = 1;
-	pool = pool->next;
-}
-int natural_number(struct header **p_pool)
-{
-	int len;
-	int block;
-	apmath_base_t dig;
-	apmath_base_t buf[16];
-
-	apmath_base_array_zero(buf, 16);
-	while(1) {
-		int c;
-		apmath_base_t ten = 10;
-
-		c = getchar();
-		if(c == ' ') {
-			break;
-		}
-		dig = c - '0';
-		apmath_base_array_resize(
-			buf, 16, &len);
-		memmove(&buf[1], buf, len);
-//		printf("OK1:\t");
-//		print_number(buf, 16);
-		apmath_base_array_multiply(
-			buf, &buf[len],
-			&buf[1], len,
-			&ten, 1);
-//		printf("OK2:\t");
-//		print_number(buf, 16);
-		apmath_base_array_resize(
-			buf, len + 1, &len);
-		apmath_base_array_add(
-			buf, &buf[len],
-			&dig, 1,
-			buf, len,
-			APMATH_BASE_ZERO);
-//		printf("OK3:\t");
-//		print_number(buf, 16);
-	}
-
-	apmath_base_array_resize(buf, len + 1, &len);
-	block = sizeof(int) + sizeof(apmath_base_t) * ((8*len + 7)/8);
-	header_split(*p_pool, block, 3);
-	apmath_base_array_zero(USED_DATA(*p_pool), block);
-	*(int *)USED_DATA(*p_pool) = len;
-	memcpy(&((int *)USED_DATA(*p_pool))[1], buf, sizeof(apmath_base_t) * len);
-	*p_pool = (*p_pool)->next;
-}
-
+#if 1
 int main()
 {
-	struct header *arena, *proc;
-	struct header *head1, *head2, *head3, *head4;
-	struct header *variable;
-	printf("hello, world!\n");
-	printf("sizeof(pointer) = %d\n", sizeof(struct pointer));
-	printf("sizeof(header) = %d\n", sizeof(struct header));
+	struct angel_header *arena, *proc;
+	struct angel_header *head1, *head2, *head3, *head4;
+	struct angel_header *variable;
 
-	header_init(buffer, sizeof(buffer));
+	printf("hello, world!\n");
+	printf("sizeof(pointer) = %d\n", sizeof(struct funlist_cyclic_pointer));
+	printf("sizeof(angel_header) = %d\n", sizeof(struct angel_header));
+
+	angel_free_header_init(buffer, sizeof(buffer));
 
 	pool = buffer;
 	printf("link, size = %d, %d\n",
-		used_header_link(pool), used_header_size(pool));
+		angel_lock_header_link(pool), angel_lock_header_size(pool));
 
 	print(buffer);
 	printf("################################\n"); fflush(stdout);
 
 #if 0
-	header_split(pool, 1024, 8); proc = pool; pool = pool->next;
-	used_header_set_link(proc, 0, proc);
+	angel_header_split(pool, 1024, 8); proc = pool; pool = pool->next;
+	angel_lock_header_set_link(proc, 0, proc);
 #endif
 
-	header_split(pool, 0, 8);
+	angel_header_split(pool, 0, 8);
 	variable = pool;
 	pool = pool->next;
 
-	header_split(pool, 8, 1);
-	strcpy(USED_DATA(pool), "add");
-	used_header_set_link(variable, 0, pool);
+	angel_header_split(pool, 8, 1);
+	strcpy(LOCK_DATA(pool), "add");
+	angel_lock_header_set_link(variable, 0, pool);
 	pool = pool->next;
 
-	header_split(pool, 8, 1);
-	strcpy(USED_DATA(pool), "square");
-	used_header_set_link(variable, 1, pool);
+	angel_header_split(pool, 8, 1);
+	strcpy(LOCK_DATA(pool), "square");
+	angel_lock_header_set_link(variable, 1, pool);
 	pool = pool->next;
 
-	header_split(pool, sizeof(int), 3);
-	*(int *)USED_DATA(pool) = 0;
+	angel_header_split(pool, sizeof(int), 3);
+	*(int *)LOCK_DATA(pool) = 0;
 	pool = pool->next;
 
-	header_split(pool, sizeof(int), 3);
-	*(int *)USED_DATA(pool) = 1;
+	angel_header_split(pool, sizeof(int), 3);
+	*(int *)LOCK_DATA(pool) = 1;
 	pool = pool->next;
 
-//	header_split(pool, 10, 1); head1 = pool; pool = pool->next;
-//	header_split(pool, 20, 2); head2 = pool; pool = pool->next;
-//	header_split(pool, 30, 3); head3 = pool; pool = pool->next;
-//	used_header_set_link(head1, 0, head2);
-//	used_header_set_link(head2, 0, head1);
-//	used_header_set_link(head3, 0, head1);
+//	angel_header_split(pool, 10, 1); head1 = pool; pool = pool->next;
+//	angel_header_split(pool, 20, 2); head2 = pool; pool = pool->next;
+//	angel_header_split(pool, 30, 3); head3 = pool; pool = pool->next;
+//	angel_lock_header_set_link(head1, 0, head2);
+//	angel_lock_header_set_link(head2, 0, head1);
+//	angel_lock_header_set_link(head3, 0, head1);
 
 	print(buffer);
 	printf("################################\n"); fflush(stdout);
 
 //	migrate(head2, pool); head4 = pool; pool = pool->next;
 //	print(buffer);
-	natural_number(&pool);
 }
+#endif

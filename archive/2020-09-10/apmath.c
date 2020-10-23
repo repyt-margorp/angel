@@ -1022,7 +1022,7 @@ int test()
 }
 
 
-#if 0
+#if 1
 int main()
 {
 	int i;
