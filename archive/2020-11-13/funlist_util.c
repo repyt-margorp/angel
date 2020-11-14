@@ -18,20 +18,20 @@
  ****************************************************************
  * @brief
  *	Get-function for prev of cyclic pointer.
- * @param[in] param
- *	Parameter, which is not used.
- * @param[out] p_link
- *	Prev pointer.
- * @param[in] lst
+ * @param[in] (param)
+ *	Parameter, not used.
+ * @param (lst)
  *	List data.
+ * @param[out] (p_link)
+ *	Prev pointer.
  * @return
  *	0 for success. Otherwise non-zero.
  ****************************************************************
  */
 int funlist_cyclic_pointer_prev(
 	void *param,
-	void ***p_link,
-	void *lst)
+	void *lst,
+	void ***p_link)
 {
 	struct funlist_cyclic_pointer *cycptr =
 		(struct funlist_cyclic_pointer *)lst;
@@ -48,20 +48,20 @@ int funlist_cyclic_pointer_prev(
  ****************************************************************
  * @brief
  *	Get-function for next of cyclic pointer.
- * @param[in] param
- *	Parameter, which is not used.
- * @param[out] p_link
- *	Next pointer.
- * @param[in] lst
+ * @param[in] (param)
+ *	Parameter, not used.
+ * @param (lst)
  *	List data.
+ * @param[out] (p_link)
+ *	Prev pointer.
  * @return
  *	0 for success. Otherwise non-zero.
  ****************************************************************
  */
 int funlist_cyclic_pointer_next(
 	void *param,
-	void ***p_link,
-	void *lst)
+	void *lst,
+	void ***p_link)
 {
 	struct funlist_cyclic_pointer *cycptr =
 		(struct funlist_cyclic_pointer *)lst;
@@ -74,21 +74,22 @@ int funlist_cyclic_pointer_next(
 
 	return 0;
 }
-
 /**
  ****************************************************************
  * @brief
- *	Set-function for pointer of cyclic pointer.
- * @param[in] ptr
- *	Pointer to be set.
- * @param[in] lst
+ *	Get-function for prev of cyclic pointer.
+ * @param[in] (param)
+ *	Parameter, not used.
+ * @param (lst)
  *	List data.
+ * @param[out] (p_link)
+ *	Prev pointer.
  * @return
  *	0 for success. Otherwise non-zero.
  ****************************************************************
  */
 int funlist_cyclic_pointer_set(
-	void *ptr,
+	void *mem,
 	void *lst)
 {
 	struct funlist_cyclic_pointer *cycptr =
@@ -98,36 +99,7 @@ int funlist_cyclic_pointer_set(
 		return 1;
 	}
 
-	((struct funlist_cyclic_pointer *)cycptr)->pointer = ptr;
-
-	return 0;
-}
-/**
- ****************************************************************
- * @brief
- *	Get-function for pointer of cyclic pointer.
- * @param[in] ptr
- *	Pointer to be set.
- * @param[in] lst
- *	List data.
- * @return
- *	0 for success. Otherwise non-zero.
- ****************************************************************
- */
-int funlist_cyclic_pointer_get(
-	void **p_ptr,
-	void *lst)
-{
-	struct funlist_cyclic_pointer *cycptr =
-		(struct funlist_cyclic_pointer *)lst;
-
-	if(lst == NULL) {
-		return 1;
-	}
-
-	if(p_ptr != NULL) {
-		*p_ptr = ((struct funlist_cyclic_pointer *)cycptr)->pointer;
-	}
+	((struct funlist_cyclic_pointer *)cycptr)->pointer = mem;
 
 	return 0;
 }

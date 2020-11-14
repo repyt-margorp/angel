@@ -20,14 +20,11 @@ int yywrap()
 %token <str> SYMBOL
 %token <str> NUMBER
 %token COMMA
-%token PERIOD
 %token COLON
+%token DOLLAR
 %token SEMICOLON
 %token ARROW
 %token ASSIGN
-
-%token DOLLAR
-%token BACK_SLASH
 
 %token PAREN_BEGIN
 %token PAREN_END
@@ -37,37 +34,27 @@ int yywrap()
 %left COMMA
 %left ARROW
 
-%type <str> judge
 %type <str> typing
 %type <str> assign
+%type <str> judge
 
-%type <str> any
-%type <str> base_any
-
+%type <str> type_term
 %type <str> term
-%type <str> type
-%type <str> term_and_type
-
+%type <str> pi_term
+%type <str> sigma_term
 %type <str> base_term
 %type <str> application
-//%type <str> abstraction
 
-%type <str> base_type
+%type <str> type
 %type <str> pre_type
 %type <str> pi_type
 %type <str> sigma_type
-
-//%type <str> tuple
 
 %%
 
 program
 	: /*none*/
 	| judge SEMICOLON program
-;
-judge
-	: typing
-	| assign
 ;
 typing
 	: SYMBOL COLON type {
@@ -81,81 +68,79 @@ assign
 		sprintf($$, "(%s := %s)", $1, $3);
 	}
 ;
-
-any
-	: term
-	| type
+judge
+	: typing
+	| assign
 ;
-base_term
+
+type_term
 	: SYMBOL
+	| application
+;
+term
+	: base_term
+//	| pi_term
+//	| sigma_term
 	| PAREN_BEGIN term PAREN_END {
 		printf("paren term: ( %s(term) )\n", $2);
 		sprintf($$, "(%s)", $2);
 	}
 ;
-base_any
-	: base_term
-	| NUMBER
+pi_term
+	: type BLOCK_BEGIN BLOCK_END {
+		printf("pi_term: %s(type)\n", $1);
+		sprintf($$, "\\%s", $1);
+	}
 ;
+sigma_term
+	: term COMMA term {
+		printf("sigma term: %s(term) , %s(term)\n", $1, $3);
+		sprintf($$, "(%s , %s)", $1, $3);
+	}
+;
+base_term
+	: SYMBOL
+	| NUMBER
+	| PAREN_BEGIN application PAREN_END {
+		printf("paren term: ( %s(term) )\n", $2);
+		sprintf($$, "(%s)", $2);
+	}
 application
 	: base_term
-	| application base_any {
+	| term base_term {
 		printf("application: %s(term) %s(term)\n", $1, $2);
-		sprintf($$, "(%s %s)", $1, $2);
+		sprintf($$, "%s(%s)", $1, $2);
 	}
 ;
 
-/*
-base_type
-	: SYMBOL
+type
+	: sigma_type
 	| PAREN_BEGIN type PAREN_END {
 		printf("paren type: ( %s(type) )\n", $2);
 		sprintf($$, "(%s)", $2);
 	}
 ;
-*/
 pre_type
-	: application
+	: type
 	| PAREN_BEGIN typing PAREN_END {
-		printf("pre type: %s(typing)\n", $2);
+		printf("paren pre type: ( %s(pre type) )\n", $2);
 		sprintf($$, "(%s)", $2);
 	}
 ;
 pi_type
-	: application
+	: type_term
 	| pre_type ARROW pi_type {
 		printf("pi type: %s(type) -> %s(type)\n", $1, $3);
-		sprintf($$, "(%s -> $s)", $1, $3);
+		sprintf($$, "(%s -> %s)", $1, $3);
 	}
 ;
 sigma_type
 	: pi_type
 	| pre_type COMMA sigma_type {
 		printf("sigma type: %s(type) , %s(type)\n", $1, $3);
-		sprintf($$, "(%s , $s)", $1, $3);
+		sprintf($$, "(%s , %s)", $1, $3);
 	}
 ;
-
-tuple
-	: application
-	| pi_type
-	|  COMMA sigma_type {
-		printf("sigma type: %s(type) , %s(type)\n", $1, $3);
-		sprintf($$, "(%s , $s)", $1, $3);
-	}
-;
-
-term
-	: tuple
-	//: application
-;
-type
-	: sigma_type
-	//: pi_type
-;
-
-/*
-*/
 
 %%
 

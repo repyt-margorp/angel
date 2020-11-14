@@ -18,8 +18,8 @@ struct angel_header {
 
 int angel_header_prev(
 	void *param,
-	void ***p_link,
-	void *lst)
+	void *lst,
+	void ***p_link)
 {
 	struct angel_header *head =
 		(struct angel_header *)lst;
@@ -34,8 +34,8 @@ int angel_header_prev(
 }
 int angel_header_next(
 	void *param,
-	void ***p_link,
-	void *lst)
+	void *lst,
+	void ***p_link)
 {
 	struct angel_header *head =
 		(struct angel_header *)lst;
@@ -69,8 +69,8 @@ struct angel_free_header {
 };
 struct angel_lock_header {
 	struct funlist_cyclic_pointer *ring;
-	//struct funlist_cyclic_pointer *link;
 	void *data;
+	//struct funlist_cyclic_pointer *link;
 };
 
 #define FREE(head)	((struct angel_free_header *)&((struct angel_header *)head)[1])
@@ -80,8 +80,8 @@ struct angel_lock_header {
 
 int angel_free_header_prev(
 	void *param,
-	void ***p_link,
-	void *lst)
+	void *lst,
+	void ***p_link)
 {
 	if(lst == NULL || p_link == NULL) {
 		return 1;
@@ -93,8 +93,8 @@ int angel_free_header_prev(
 }
 int angel_free_header_next(
 	void *param,
-	void ***p_link,
-	void *lst)
+	void *lst,
+	void ***p_link)
 {
 	if(lst == NULL || p_link == NULL) {
 		return 1;
@@ -322,10 +322,10 @@ int angel_lock_header_set_link(
 	if(target != NULL) {
 		if(LOCK(target)->ring == &LOCK_LINK(head)[n]) {
 			funlist_list_is_last(NULL,
-				&is_single,
 				funlist_cyclic_pointer_prev,
 				&LOCK_LINK(head)[n],
-				&LOCK_LINK(head)[n]);
+				&LOCK_LINK(head)[n],
+				&is_single);
 
 			if(is_single) {
 				LOCK(target)->ring = NULL;
